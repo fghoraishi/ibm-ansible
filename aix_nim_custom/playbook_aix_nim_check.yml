@@ -1,0 +1,24 @@
+---
+#  The tagets name could be of the following form all in quotes:
+#  target*          all the nim client machines whose name starts with 'target'
+#  target[n1:n2]    where n1 and n2 are numeric: target<n1> to target<n2>
+#   * or ALL        all the nim client machines
+#   client_name     the nim client named 'client_name'
+#   master          the nim master
+#   sample:         target[1:5] target12 other_target
+
+- name: "NIM check on AIX playbook"
+  hosts: all
+  gather_facts: no
+
+  tasks:
+
+    - name: "AIX NIM"
+      aix_nim_custom:
+        action: 'check'
+        description: 'NIM check'
+        targets: "aix-clnt-1"
+      register: nim_output
+
+    - debug: var=nim_output
+

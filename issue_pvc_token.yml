@@ -1,0 +1,66 @@
+---
+
+- name: Get input from user to generate token
+  hosts: localhost
+  gather_facts: no
+  
+  # Prompt user to provide project name, User ID and password
+  vars_prompt:
+    - name: user_project
+      private: false
+    - name: user_id
+      private: false
+    - name: user_password
+      private: true
+
+  vars:
+    pvc_base_url: "https://10.150.254.46:5000"
+    pvc_token: empty
+    auth_string:
+      auth: 
+        scope:
+          project:
+            name: "{{ user_project }}"
+            domain:
+              name: "Default"
+        identity:
+          methods:
+          - password
+          password:
+            user: 
+              domain:
+                name: "Default"
+              name: "{{ user_id }}"
+              password: "{{ user_password }}"
+  tasks:
+      
+  - name:  "Get PowerVC token for project: {{ user_project|upper}} using credentials provided by user: {{ user_id|upper }}"
+    uri:
+      url: "{{ pvc_base_url }}/v3/auth/tokens"
+      method: POST
+      headers:
+        Content-Type: "application/json"
+      body: "{{ auth_string |to_nice_json }}"
+      body_format: json
+      validate_certs: False
+      force_basic_auth: yes
+      status_code: 201
+    register: results
+    no_log: true
+  - debug: var=results
+  - name: processing token and copy to vars/auth_token.yml
+    block:
+    
+      - name: received the following token
+        debug: 
+          var: results.x_subject_token
+
+      - set_fact:
+          pvc_token: "{{ results.x_subject_token }}"
+    
+      - name: "writing token to vars/auth_token.yml"
+        template:
+          src: templates/auth_token.j2
+          dest: vars/auth_token.yml
+    when: results.x_subject_token is defined
+

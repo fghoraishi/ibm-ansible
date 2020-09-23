@@ -1,0 +1,8 @@
+version: "3"
+services:
+  ansibletower: 
+    image: ansible/centos7-ansible:latest
+  linux-tar1: 
+    image: centos:latest
+  linux-tar2: 
+    image: centos:latest

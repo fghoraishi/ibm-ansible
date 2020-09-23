@@ -1,0 +1,6 @@
+---
+- hosts: all 
+  tasks: 
+  - copy:
+      src: /tmp/testfile 
+      dest: /tmp/testfile 

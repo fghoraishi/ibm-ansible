@@ -1,0 +1,100 @@
+---
+
+- name: Get PowerVC Projects
+  hosts: localhost
+  gather_facts: no
+
+  vars:
+    pvc_token: "{{ lookup('file','vars/auth_token.yml')}}"
+    pvc_base_url: "https://10.150.254.46:5000"
+    pvc_ip_address: empty
+    network_list: []
+    vm_list: []
+    pvc_tenant: 'ibm-default'
+  tasks:
+    
+# --------------------------------------------------------------------------------------
+# Get List of tenants with IDs 
+# using the os_project module requires 0.12 version of opestacksdk on the PowerVC node
+# - os_project_facts:
+#     cloud: https://10.150.254.46:5000
+# - debug:
+#     var: openstack_projects
+# using curl will work but Ansible recommends uri
+# curl -1 -k -X GET https://10.150.254.46:5000/v3/projects -H "X-Auth-Token:<your token>" | python -mjson.tool
+# In Ansible we will use the 'uri' module instead of curl
+# --------------------------------------------------------------------------------------
+
+  - name:  Get List of tenants with IDs
+    uri:
+      url: "{{ pvc_base_url }}/v3/projects"
+      method: GET
+      headers:
+          Content-Type: "application/json"
+          X-Auth-Token: "{{ pvc_token }}"
+      validate_certs: False
+    register: results
+    no_log: true
+
+  - debug: 
+      msg: |
+           Found "{{ results.json.projects |length }}"  projects
+           --------------------------------------
+           {% for items in results.json.projects %}
+           {{items.id}}  - {{items.name}}   ID: {{items.description}}
+           {% endfor %}
+
+
+  - set_fact:
+      pvc_tenant_ID: "{{item.id}}"
+    with_items: "{{ results.json.projects }}"
+    when: item.name == pvc_tenant
+    no_log: true  
+
+# --------------------------------------------------------------------------------------
+# Get a list of VMs for selected tenant
+# curl -1 -k -X GET https://10.150.254.141:5000/powervc/openstack/compute/v2.1/<tenantID>/servers -H "X-Auth-Token:<myToken>" | python -mjson.tool
+#
+# In Ansible we will use the 'uri' module instead of curl
+# --------------------------------------------------------------------------------------
+
+  - name:  Get a list of VMs for selected tenant
+    uri:
+      url: "{{ pvc_base_url }}/powervc/openstack/compute/v2.1/{{ pvc_tenant_ID }}/servers"
+      method: GET
+      headers:
+          Content-Type: "application/json"
+          X-Auth-Token: "{{ pvc_token }}"
+      validate_certs: False
+     # force_basic_auth: yes
+     # status_code: 201
+    register: results
+    #no_log: true
+
+  - debug: 
+      msg: |
+           Found "{{ results.json.servers |length }}" VMs for Project: "{{pvc_tenant}}"
+           ------------------------------------------------------
+           {% for items in results.json.servers %}
+           {{items.id}}  - {{items.name}}
+           {% endfor %}
+
+  - debug: var= results.json.servers[4].name
+
+  - set_fact:
+      selected_vm: "{{ results.json.servers[4].name }}"
+
+  - name:  "Stop VM: {{ selected_vm }}"
+    uri:
+      url: "{{ pvc_base_url }}/powervc/openstack/compute/v2.1/{{ pvc_tenant_ID }}/servers/{{ selected_vm }}/action/os-stop"
+      method: POST
+      headers:
+          Content-Type: "application/json"
+          X-Auth-Token: "{{ pvc_token }}"
+      validate_certs: False
+     # force_basic_auth: yes
+      status_code: 202
+    register: vm_stop_results
+    #no_log: true
+
+  - debug: var=vm_stop_results
